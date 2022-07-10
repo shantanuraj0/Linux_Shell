@@ -1,9 +1,11 @@
+// including all necessary headers
+
 #include  <stdio.h>
 #include  <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <dirent.h>
+#include <dirent.h> //for using function related to directory listings
 
 
 
@@ -14,87 +16,63 @@ int errno;
 
 
 
-#define MAX_INPUT_SIZE 1024
-#define MAX_TOKEN_SIZE 64
-#define MAX_NUM_TOKENS 64
+#define MAX_INPUT_SIZE 1024 // maximum  input size
+#define MAX_TOKEN_SIZE 64 // maximum token size of 1 token
+#define MAX_NUM_TOKENS 64 // maximum number of tokens allowed
 
 
-
-
-int check_pipe(char *input)
-{ 
-        int p,count=0;
-        
-        for(p=0;p<strlen(input);p++)
-        {if(input[p] == '|')
-                count++;
+//print tokens
+void printTokens(char ** tokens){
+        int size = sizeof(tokens)/sizeof(tokens[0]);
+        for(int i=0; i<size; i++){ 
+                printf("%s", tokens[i]);
         }
-        return count;
+        printf("\n");      
 }
 
 
-
-char **pipe_parse(char *input)
-{
-        char **tokens = (char **)malloc(MAX_NUM_TOKENS * sizeof(char *));
-        char *tok = (char *)malloc(MAX_TOKEN_SIZE * sizeof(char));
-        int p, token_Index = 0, token_No = 0;
-
-        for(p =0; p < strlen(input); p++)
-        {
-
-                char readChar = input[p];
-                if(input[p-1] == '|')
-                        continue;
-                if (readChar == '|' || readChar == '\n' || readChar == '\t')
-                {
-
-                        tok[token_Index] = '\0';
-                        if (token_Index != 0)
-                        {
-                                tokens[token_No] = (char*)malloc(MAX_TOKEN_SIZE*sizeof(char));
-                                strcpy(tokens[token_No++], tok);
-                                token_Index = 0;
-                        }
-                } else {
-
-                        tok[token_Index++] = readChar;
-                }
-        }
-
-        free(tok);
-        tokens[token_No] = NULL ;
-        return tokens;
-
-}
-
-
-
+//splits the string by space and returns the array of tokens
+//this function will separate the line string into different words/tokens
+//input : "sleep 5"
+//output : ["sleep" ,"5"]
 char **tokenize(char *input)
-{
+{       
+        //allocate memory for tokens array & for each token
         char **tokens = (char **)malloc(MAX_NUM_TOKENS * sizeof(char *));
         char *tok = (char *)malloc(MAX_TOKEN_SIZE * sizeof(char));
-        int p, token_Index = 0, token_No = 0;
+        int p;
+        int token_Index = 0;//for each token
+        int token_No = 0; //for index of tokens array
 
+        //it goes over each character of input
         for(p =0; p < strlen(input); p++)
         {
-
+                //read character by character
                 char readChar = input[p];
 
+                //check if it is a white space characters
+                //then insert that token into tokens array on token_No position
                 if (readChar == ' ' || readChar == '\n' || readChar == '\t'){
+                        
                         tok[token_Index] = '\0';
                         if (token_Index != 0)
-                        {
+                        {       
+                                // printf("token: %s" ,tok );
+                                // printf("\n");
+                                //allocate memory for token in tokens array
                                 tokens[token_No] = (char*)malloc(MAX_TOKEN_SIZE*sizeof(char));
-                                strcpy(tokens[token_No++], tok);
-                                token_Index = 0;
+                                strcpy(tokens[token_No++], tok); //copy that token in tokens array on token_No pos and do ++
+                                token_Index = 0; //reset it for next token
                         }
-                } else 
+                } 
+                else 
                 {
+                        //not a white space characters,then add it to token
                         tok[token_Index++] = readChar;
                 }
         }
 
+        //finally free memory and return tokens array
         free(tok);
         tokens[token_No] = NULL ;
         return tokens;
@@ -105,8 +83,8 @@ char **tokenize(char *input)
 int main(int argc, char* argv[])
  {
         
-        char  input_line[MAX_INPUT_SIZE];
-        char  **tokens;
+        char  input_line[MAX_INPUT_SIZE]; //store the input
+        char  **tokens; //stores the tokens
         int i;
 
         printf("\n\n******** Welcome to my shell ********\n\n");
@@ -114,82 +92,32 @@ int main(int argc, char* argv[])
         int back=0;
         while(2) 
         {
-
+                // erase the given memory area with zero bytes(\0)
                 bzero(input_line, sizeof(input_line));
                 printf("<<shantanu_raj>> ");
 
+                //take input from user
+                //will read all characters until you reach \n (or EOF)
                 scanf("%[^\n]", input_line);
-                getchar();
+                getchar(); //it will wait for the user to enter a new line character
 
+                //user has hit enter only without typing anything 
                 if(strcmp(input_line,"\0") ==0 )
                         continue;
 
 
+                //input string terminated with new line 
                 input_line[strlen(input_line)] = '\n';
 
-                if(check_pipe(input_line)!=0)
-                { 
-                        
-                        int i,num_pipe = check_pipe(input_line),status;
 
-                        tokens = pipe_parse(input_line);
-                        
-                        char **str;
-                        
-                        int pipes[2*num_pipe];
-                        
-                        for(i=0;i<(2*num_pipe);i+=2)
-                                pipe(pipes+i);
-                        int j;
-                        
+                
+                //get tokens array
+                tokens = tokenize(input_line);
 
-                        int g=0;
-                        for(i=0; i<num_pipe+1; i++ )
-                           {  
-                                   if(i==num_pipe)
-                                  { 
-                                     int length = strlen(tokens[i]);
-                                     tokens[i][length-1] = ' ';
-                                     strcat(tokens[i]," ");
-                                  }
-
-                                 str = tokenize(tokens[i]);
-
-                                 if(fork()==0)
-                                    {
-                                         if(i==0)
-                                          dup2(pipes[1],1);
-                                      else if(i==num_pipe)
-                                          dup2(pipes[(2*i)-2],0);
-                                      else
-                                        {
-                                          dup2(pipes[g],0);
-                                          dup2(pipes[g+3],1);
-                                          g=g+2;
-                                        }
-
-                                        for(j=0;j<(2*num_pipe);j++)
-                                               close(pipes[j]);
-
-                                        if(execvp(str[0],str)<0)
-                                                printf("Invalid Command!\n");
-                                    }
-                             }
-
-                            for(j=0;j<(2*num_pipe);j++)
-                                               close(pipes[j]);
-
-                           
-                           for (i = 0; i < num_pipe+1; i++)
-                                        wait(&status);
+                printTokens;
 
 
-                        continue;
-                   }
-
-        tokens = tokenize(input_line);
-
-
+                //handling different commands
                 if(strcmp(tokens[0],"exit") == 0 )  //to handle exit command
                 {
                         printf("***************Exiting****************\n");
@@ -198,7 +126,9 @@ int main(int argc, char* argv[])
                 }
 
                 if(strcmp(tokens[0],"cd") ==0 )  // to handle cd command
-                { 
+                {       
+                        // chdir(const char *path) : changes the current working directory of the calling process to the directory specified in path.
+                        //On success, zero is returned.  On error, -1 is returned,
                         char str[1000];
                         if(chdir(tokens[1])== 0)
                                 printf("changed dir. to : %s\n",getcwd(str,1000));
@@ -207,8 +137,10 @@ int main(int argc, char* argv[])
 
                 if(strcmp(tokens[0],"pwd") ==0 ) // to handle pwd command
                 {
+                        //char *getcwd(char *buf, size_t size) : The getcwd() function copies an absolute pathname of the current working directory to the array pointed to by buf, which is of length size.
+                        //On success, these functions return a pointer to a string containing the pathname of the current working directory
+                        //On failure, these functions return NULL
                          char str[1000];
-
                         printf("current dir. : %s\n",getcwd(str,1000));
                         continue;
                 }
@@ -216,18 +148,24 @@ int main(int argc, char* argv[])
                 
                 if(strcmp(tokens[0],"ls") ==0 )  // to handle ls command
                 {  {
-
+                           //he opendir() system call function is used to open a directory and to return a pointer on this directory
                            DIR *dir = opendir(".");
                            struct dirent *dp;
-
+                        
+                           // read each entry in directory
+                           /*If successful, readdir() returns a pointer to a dirent structure describing the next directory entry in the directory stream.
+                            When readdir() reaches the end of the directory stream, it returns a NULL pointer and and sets errno */
                            while ((dp = readdir(dir)) != NULL)
                                    printf("%s  ", dp->d_name);
-
+                          
+                          // Close directory
                            closedir(dir);
                           printf("\n");
                            continue;
-                   }}
+                }}
 
+
+                //create a new child process in order to execute different commands
                 pid_t p_id = fork();
 
 
@@ -241,29 +179,34 @@ int main(int argc, char* argv[])
                         tokens[i]=NULL;
                 }
 
-                
+                //forking failed
                 if (p_id == -1)
                  {
                         printf("\nFailed");
-                        return;
+                        return -1;
                 }
                  else if (p_id == 0)
                   {
+                        //child process
+                        //take executable name as first argument
+                        //it will search for the executable in the linux system , if it finds it then it will reintialize the memory image of child process with code of this executable 
                         if (execvp(tokens[0],tokens) < 0 ) 
-                        {
+                        {       //unable to find executable
                                 printf("\nUnable to execute given command..\n");
                         }
                         exit(0);
                 } 
                 else
-                 {
+                 {      
+                        //parent process
+                        //parent will wait for the child process to exit
                         if(back==0)
                                 waitpid(p_id,NULL,0);
 
                 }
 
 
-
+                //parent will clear all the memory used by child
                 for(i=0;tokens[i] != NULL; i++ )
                 {
                         free(tokens[i]);
